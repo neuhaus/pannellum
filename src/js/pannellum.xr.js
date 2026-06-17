@@ -289,7 +289,7 @@
                         if (Math.abs(joystickX) > 0.7) {
                             joystickActive = true;
                             if (!snapTurnCooldown) {
-                                var angle = joystickX > 0 ? -30 : 30;
+                                var angle = joystickX > 0 ? 30 : -30;
                                 snapTurn(angle);
                                 snapTurnCooldown = true;
                             }
