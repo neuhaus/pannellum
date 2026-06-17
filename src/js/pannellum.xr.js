@@ -35,9 +35,18 @@
         var tooltipTexture = null;
         var hoveredHotspot = null;
         var tooltipAspect = 2.0;
+        var tooltipCanvas = document.createElement('canvas');
+        var tooltipCtx = tooltipCanvas.getContext('2d');
 
         // Spinner rendering components
         var spinnerTexture = null;
+        var spinnerCanvas = document.createElement('canvas');
+        spinnerCanvas.width = 512;
+        spinnerCanvas.height = 512;
+        var spinnerCtx = spinnerCanvas.getContext('2d');
+
+        // Pre-allocated array buffer for controller pointer rendering
+        var linePoints = new Float32Array(6);
 
         // Hook into the VR button click
         viewer.on('vrtoggle', function() {
@@ -540,10 +549,12 @@
                 var color = isPointing ? [0.2, 1.0, 0.2, 0.8] : [1.0, 0.2, 0.2, 0.8];
                 gl.uniform4f(lineProgram.u_color, color[0], color[1], color[2], color[3]);
 
-                var linePoints = new Float32Array([
-                    c.relOrigin[0], c.relOrigin[1], c.relOrigin[2],
-                    c.relOrigin[0] + c.dir[0] * 5.0, c.relOrigin[1] + c.dir[1] * 5.0, c.relOrigin[2] + c.dir[2] * 5.0
-                ]);
+                linePoints[0] = c.relOrigin[0];
+                linePoints[1] = c.relOrigin[1];
+                linePoints[2] = c.relOrigin[2];
+                linePoints[3] = c.relOrigin[0] + c.dir[0] * 5.0;
+                linePoints[4] = c.relOrigin[1] + c.dir[1] * 5.0;
+                linePoints[5] = c.relOrigin[2] + c.dir[2] * 5.0;
 
                 gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
                 gl.bufferData(gl.ARRAY_BUFFER, linePoints, gl.DYNAMIC_DRAW);
@@ -563,21 +574,22 @@
                 tooltipTexture = gl.createTexture();
             }
 
-            var canvas = document.createElement('canvas');
-            var ctx = canvas.getContext('2d');
-            ctx.font = '16px sans-serif';
-            var textMetrics = ctx.measureText(text);
+            var textCtx = tooltipCanvas.getContext('2d');
+            textCtx.font = '16px sans-serif';
+            var textMetrics = textCtx.measureText(text);
             var paddingX = 20;
 
-            canvas.width = Math.max(128, Math.pow(2, Math.ceil(Math.log2(textMetrics.width + paddingX * 2))));
-            canvas.height = 64;
+            var neededWidth = Math.max(128, Math.pow(2, Math.ceil(Math.log2(textMetrics.width + paddingX * 2))));
+            tooltipCanvas.width = neededWidth;
+            tooltipCanvas.height = 64;
 
-            ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Re-acquire context as setting width/height clears and resets state
+            var ctx = tooltipCanvas.getContext('2d');
+            ctx.clearRect(0, 0, neededWidth, 64);
 
             // Draw rounded rectangle background with dark semi-transparent glassmorphism styling
-            var w = canvas.width;
-            var h = canvas.height;
+            var w = neededWidth;
+            var h = 64;
             var r = 10;
             ctx.beginPath();
             ctx.moveTo(r, 0);
@@ -605,13 +617,13 @@
             ctx.fillText(text, w / 2, h / 2);
 
             gl.bindTexture(gl.TEXTURE_2D, tooltipTexture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tooltipCanvas);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-            tooltipAspect = canvas.width / canvas.height;
+            tooltipAspect = neededWidth / 64;
         }
 
         function renderVRTooltip(view, hs) {
@@ -656,11 +668,7 @@
                 spinnerTexture = gl.createTexture();
             }
 
-            var canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 512;
-            var ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, 512, 512);
+            spinnerCtx.clearRect(0, 0, 512, 512);
 
             // Draw a spinning arc
             var center = 256;
@@ -668,15 +676,15 @@
             var startAngle = (time / 200) % (2 * Math.PI);
             var endAngle = startAngle + 1.5 * Math.PI;
 
-            ctx.beginPath();
-            ctx.arc(center, center, radius, startAngle, endAngle);
-            ctx.lineWidth = 32;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = '#007AFF';
-            ctx.stroke();
+            spinnerCtx.beginPath();
+            spinnerCtx.arc(center, center, radius, startAngle, endAngle);
+            spinnerCtx.lineWidth = 32;
+            spinnerCtx.lineCap = 'round';
+            spinnerCtx.strokeStyle = '#007AFF';
+            spinnerCtx.stroke();
 
             gl.bindTexture(gl.TEXTURE_2D, spinnerTexture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, spinnerCanvas);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
