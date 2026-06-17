@@ -263,6 +263,26 @@ controls.fullscreen.className = 'pnlm-fullscreen-toggle-button pnlm-sprite pnlm-
 if (document.fullscreenEnabled || document.mozFullScreenEnabled || document.webkitFullscreenEnabled || document.msFullscreenEnabled)
     controls.container.appendChild(controls.fullscreen);
 
+// VR toggle
+controls.vr = document.createElement('div');
+controls.vr.className = 'pnlm-vr-button pnlm-sprite pnlm-controls pnlm-control';
+controls.vr.style.display = 'none';
+controls.vr.addEventListener('click', function() {
+    _this.fire('vrtoggle');
+});
+controls.vr.addEventListener('mousedown', function(e) {e.stopPropagation();});
+controls.vr.addEventListener('touchstart', function(e) {e.stopPropagation();});
+controls.vr.addEventListener('pointerdown', function(e) {e.stopPropagation();});
+controls.container.appendChild(controls.vr);
+
+if (navigator.xr) {
+    navigator.xr.isSessionSupported('immersive-vr').then(function(supported) {
+        if (supported && config.showControls != false) {
+            controls.vr.style.display = 'block';
+        }
+    });
+}
+
 // Device orientation toggle
 controls.orientation = document.createElement('div');
 controls.orientation.addEventListener('click', function(e) {
@@ -1783,6 +1803,9 @@ function renderInit() {
             params.horizonRoll = config.horizonRoll * Math.PI / 180;
         if (config.backgroundColor !== undefined)
             params.backgroundColor = config.backgroundColor;
+        if (_this.isVRPresenting) {
+            params.backgroundColor = null;
+        }
         renderer.init(panoImage, config.type, config.haov * Math.PI / 180, config.vaov * Math.PI / 180, config.vOffset * Math.PI / 180, renderInitCallback, params);
     } catch(event) {
         // Panorama not loaded
@@ -2308,6 +2331,15 @@ function processOptions(isPreview) {
                     controls.orientation.style.display = 'none';
                     controls.zoom.style.display = 'none';
                     controls.fullscreen.style.display = 'none';
+                    controls.vr.style.display = 'none';
+                } else {
+                    if (navigator.xr) {
+                        navigator.xr.isSessionSupported('immersive-vr').then(function(supported) {
+                            if (supported) {
+                                controls.vr.style.display = 'block';
+                            }
+                        });
+                    }
                 }
                 break;
 
@@ -3204,6 +3236,26 @@ this.getConfig = function() {
  */
 this.getContainer = function() {
     return container;
+};
+
+/**
+ * Get internal WebGL renderer instance.
+ * @memberof Viewer
+ * @instance
+ * @returns {Object} Renderer instance
+ */
+this.getRenderer = function() {
+    return renderer;
+};
+
+/**
+ * Fire specified event.
+ * @memberof Viewer
+ * @instance
+ * @param {string} type - Type of event to fire
+ */
+this.fire = function(type) {
+    fireEvent.apply(null, arguments);
 };
 
 /**
