@@ -45,7 +45,13 @@ To enable WebXR VR support:
    <script src="build/pannellum.js"></script>
    <script src="build/pannellum.xr.js"></script>
    ```
-2. The viewer will automatically detect WebXR capability and render a VR goggles button in the control bar. When clicked, it initiates an immersive stereoscopic session, enabling head tracking, 3D billboard hotspots, and VR controller raycasting selection.
+2. The viewer will automatically detect WebXR capability and render a VR goggles button in the control bar. When clicked, it initiates an immersive stereoscopic session.
+3. Immersive VR features include:
+   * **Head Tracking**: Smooth stereoscopic rendering responsive to headset movement.
+   * **VR Controller Interaction**: Pointer rays project from active controllers. The laser pointer dynamically highlights green when targeting a hotspot; pulling the trigger selects the hotspot.
+   * **Snap Turning**: Push the controller thumbstick left or right to rotate the view by 30 degrees at a time.
+   * **Interactive 3D Tooltips**: Text billboards float above targeted hotspots for clear descriptions.
+   * **VR Loading Spinner**: A smooth, anti-aliased 3D loading arc is displayed directly in front of the viewer's gaze during scene transitions.
 
 ### Using `generate.py` to create multires panoramas
 To be able to create multiresolution panoramas, you need to have the `nona` program installed, which is available as part of [Hugin](http://hugin.sourceforge.net/), as well as Python 3 with the [Pillow](https://pillow.readthedocs.org/) and [NumPy](https://numpy.org/) packages. The [pyshtools](https://shtools.github.io/SHTOOLS/) Python package is also recommended. Then, run
