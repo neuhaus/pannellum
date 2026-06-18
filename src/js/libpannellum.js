@@ -48,6 +48,7 @@ class Renderer {
     let pose;
     let image, imageType;
     let texCoordBuffer, cubeVertBuf, cubeVertTexCoordBuf, cubeVertIndBuf;
+    let equiCubeVAO, previewVAO, multiresVAO;
     let globalParams;
     const sides = ['f', 'b', 'u', 'd', 'l', 'r'];
     const fallbackSides = ['f', 'r', 'b', 'l', 'u', 'd'];
@@ -421,7 +422,17 @@ class Renderer {
                 texCoordBuffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,1,1,1,1,-1,-1,1,1,-1,-1,-1]), gl.STATIC_DRAW);
-            gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+            if (typeof gl.createVertexArray === 'function') {
+                equiCubeVAO = gl.createVertexArray();
+                gl.bindVertexArray(equiCubeVAO);
+                gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+                gl.enableVertexAttribArray(program.texCoordLocation);
+                gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+                gl.bindVertexArray(null);
+            } else {
+                gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+            }
 
             // Pass aspect ratio
             program.aspectRatio = gl.getUniformLocation(program, 'u_aspectRatio');
@@ -531,7 +542,6 @@ class Renderer {
             // Bind texture coordinate buffer and pass coordinates to WebGL
             gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertTexCoordBuf);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0,1,0,1,1,0,1]), gl.STATIC_DRAW);
-            gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
 
             // Bind square index buffer and pass indices to WebGL
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVertIndBuf);
@@ -539,7 +549,26 @@ class Renderer {
 
             // Bind vertex buffer
             gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertBuf);
-            gl.vertexAttribPointer(program.vertPosLocation, 3, gl.FLOAT, false, 0, 0);
+
+            if (typeof gl.createVertexArray === 'function') {
+                multiresVAO = gl.createVertexArray();
+                gl.bindVertexArray(multiresVAO);
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertTexCoordBuf);
+                gl.enableVertexAttribArray(program.texCoordLocation);
+                gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+                
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVertIndBuf);
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertBuf);
+                gl.enableVertexAttribArray(program.vertPosLocation);
+                gl.vertexAttribPointer(program.vertPosLocation, 3, gl.FLOAT, false, 0, 0);
+                
+                gl.bindVertexArray(null);
+            } else {
+                gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+                gl.vertexAttribPointer(program.vertPosLocation, 3, gl.FLOAT, false, 0, 0);
+            }
 
             // Find uniforms
             program.perspUniform = gl.getUniformLocation(program, 'u_perspMatrix');
@@ -588,7 +617,17 @@ class Renderer {
                     texCoordBuffer = gl.createBuffer();
                 gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
                 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,1,1,1,1,-1,-1,1,1,-1,-1,-1]), gl.STATIC_DRAW);
-                gl.vertexAttribPointer(previewProgram.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+                if (typeof gl.createVertexArray === 'function') {
+                    previewVAO = gl.createVertexArray();
+                    gl.bindVertexArray(previewVAO);
+                    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+                    gl.enableVertexAttribArray(previewProgram.texCoordLocation);
+                    gl.vertexAttribPointer(previewProgram.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+                    gl.bindVertexArray(null);
+                } else {
+                    gl.vertexAttribPointer(previewProgram.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+                }
 
                 // Pass aspect ratio
                 previewProgram.aspectRatio = gl.getUniformLocation(previewProgram, 'u_aspectRatio');
@@ -886,7 +925,13 @@ class Renderer {
             }
             
             // Draw using current buffer
+            if (equiCubeVAO) {
+                gl.bindVertexArray(equiCubeVAO);
+            }
             gl.drawArrays(gl.TRIANGLES, 0, 6);
+            if (equiCubeVAO) {
+                gl.bindVertexArray(null);
+            }
         
         } else {
             // Draw SHT hash preview, if needed
@@ -904,8 +949,12 @@ class Renderer {
             }
             if (drawPreview) {
                 gl.useProgram(previewProgram);
-                gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-                gl.vertexAttribPointer(previewProgram.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+                if (previewVAO) {
+                    gl.bindVertexArray(previewVAO);
+                } else {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+                    gl.vertexAttribPointer(previewProgram.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+                }
                 gl.bindTexture(gl.TEXTURE_2D, previewProgram.texture);
 
                 // Calculate focal length from vertical field of view
@@ -921,8 +970,12 @@ class Renderer {
                 // Draw using current buffer
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertBuf);
-                gl.vertexAttribPointer(program.vertPosLocation, 3, gl.FLOAT, false, 0, 0);
+                if (previewVAO) {
+                    gl.bindVertexArray(null);
+                } else {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertBuf);
+                    gl.vertexAttribPointer(program.vertPosLocation, 3, gl.FLOAT, false, 0, 0);
+                }
                 gl.useProgram(program);
             }
 
@@ -1032,9 +1085,13 @@ class Renderer {
             gl.useProgram(program);
             
             // Re-bind texture coordinate buffer and attribute location
-            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-            gl.enableVertexAttribArray(program.texCoordLocation);
-            gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+            if (equiCubeVAO) {
+                gl.bindVertexArray(equiCubeVAO);
+            } else {
+                gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+                gl.enableVertexAttribArray(program.texCoordLocation);
+                gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+            }
             
             // Re-bind active texture
             var glBindType = (imageType == 'cubemap') ? gl.TEXTURE_CUBE_MAP : gl.TEXTURE_2D;
@@ -1049,19 +1106,28 @@ class Renderer {
             }
             
             gl.drawArrays(gl.TRIANGLES, 0, 6);
+            
+            if (equiCubeVAO) {
+                gl.bindVertexArray(null);
+            }
             gl.uniform1i(program.useMatrix, 0);
         } else {
             // Multires
             gl.useProgram(program);
             
             // Re-bind buffers and attributes
-            gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertBuf);
-            gl.enableVertexAttribArray(program.vertPosLocation);
-            gl.vertexAttribPointer(program.vertPosLocation, 3, gl.FLOAT, false, 0, 0);
-            
-            gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertTexCoordBuf);
-            gl.enableVertexAttribArray(program.texCoordLocation);
-            gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+            if (multiresVAO) {
+                // When using VAO, attribute layouts and element array buffers are bound inside the VAO.
+                // We don't need to bind them manually here, multiresDraw will handle it.
+            } else {
+                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertBuf);
+                gl.enableVertexAttribArray(program.vertPosLocation);
+                gl.vertexAttribPointer(program.vertPosLocation, 3, gl.FLOAT, false, 0, 0);
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertTexCoordBuf);
+                gl.enableVertexAttribArray(program.texCoordLocation);
+                gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+            }
             
             gl.activeTexture(gl.TEXTURE0);
             
@@ -1234,6 +1300,16 @@ class Renderer {
             if (clear)
                 gl.clear(gl.COLOR_BUFFER_BIT);
 
+            if (multiresVAO) {
+                gl.bindVertexArray(multiresVAO);
+            } else {
+                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertTexCoordBuf);
+                gl.vertexAttribPointer(program.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVertIndBuf);
+                gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertBuf);
+                gl.vertexAttribPointer(program.vertPosLocation, 3, gl.FLOAT, false, 0, 0);
+            }
+
             // Determine tiles that need to be drawn
             var node_paths = {};
             for (var i = 0; i < program.currentNodes.length; i++) {
@@ -1251,12 +1327,16 @@ class Renderer {
                     //gl.uniform4f(program.colorUniform, color[0], color[1], color[2], 1.0);
                     
                     // Pass vertices to WebGL
+                    gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertBuf);
                     gl.bufferData(gl.ARRAY_BUFFER, program.currentNodes[i].vertices, gl.STATIC_DRAW);
 
                     // Bind texture and draw tile
                     gl.bindTexture(gl.TEXTURE_2D, program.currentNodes[i].texture); // Bind program.currentNodes[i].texture to TEXTURE0
                     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
                 }
+            }
+            if (multiresVAO) {
+                gl.bindVertexArray(null);
             }
             program.drawInProgress = false;
         }
