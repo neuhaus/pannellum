@@ -27,6 +27,8 @@
         var lineBuffer = null;
         var infoTexture = null;
         var sceneTexture = null;
+        var hotspotVAO = null;
+        var lineVAO = null;
 
         // VR Controllers tracking
         var controllers = [];
@@ -206,6 +208,27 @@
             lineProgram.u_color = gl.getUniformLocation(lineProgram, 'u_color');
 
             lineBuffer = gl.createBuffer();
+
+            // Setup Vertex Array Objects (VAOs) if supported (WebGL 2)
+            if (typeof gl.createVertexArray === 'function') {
+                hotspotVAO = gl.createVertexArray();
+                gl.bindVertexArray(hotspotVAO);
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+                gl.enableVertexAttribArray(vrProgram.a_position);
+                gl.vertexAttribPointer(vrProgram.a_position, 2, gl.FLOAT, false, 16, 0);
+                gl.enableVertexAttribArray(vrProgram.a_texCoord);
+                gl.vertexAttribPointer(vrProgram.a_texCoord, 2, gl.FLOAT, false, 16, 8);
+                
+                lineVAO = gl.createVertexArray();
+                gl.bindVertexArray(lineVAO);
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+                gl.enableVertexAttribArray(lineProgram.a_position);
+                gl.vertexAttribPointer(lineProgram.a_position, 3, gl.FLOAT, false, 0, 0);
+                
+                gl.bindVertexArray(null);
+            }
         }
 
         function createShaderProgram(vsSrc, fsSrc) {
@@ -499,11 +522,15 @@
             gl.uniform3fv(vrProgram.u_cameraUp, cameraUp);
 
             // Bind quad buffer and attributes
-            gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-            gl.enableVertexAttribArray(vrProgram.a_position);
-            gl.vertexAttribPointer(vrProgram.a_position, 2, gl.FLOAT, false, 16, 0);
-            gl.enableVertexAttribArray(vrProgram.a_texCoord);
-            gl.vertexAttribPointer(vrProgram.a_texCoord, 2, gl.FLOAT, false, 16, 8);
+            if (hotspotVAO) {
+                gl.bindVertexArray(hotspotVAO);
+            } else {
+                gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+                gl.enableVertexAttribArray(vrProgram.a_position);
+                gl.vertexAttribPointer(vrProgram.a_position, 2, gl.FLOAT, false, 16, 0);
+                gl.enableVertexAttribArray(vrProgram.a_texCoord);
+                gl.vertexAttribPointer(vrProgram.a_texCoord, 2, gl.FLOAT, false, 16, 8);
+            }
 
             gl.uniform2f(vrProgram.u_size, 0.4, 0.4); // Size of hotspot in meters
 
@@ -518,8 +545,12 @@
             });
 
             // Clean up attributes
-            gl.disableVertexAttribArray(vrProgram.a_position);
-            gl.disableVertexAttribArray(vrProgram.a_texCoord);
+            if (hotspotVAO) {
+                gl.bindVertexArray(null);
+            } else {
+                gl.disableVertexAttribArray(vrProgram.a_position);
+                gl.disableVertexAttribArray(vrProgram.a_texCoord);
+            }
         }
 
         function renderVRControllerPointers(view) {
@@ -559,14 +590,22 @@
                 gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
                 gl.bufferData(gl.ARRAY_BUFFER, linePoints, gl.DYNAMIC_DRAW);
 
-                gl.enableVertexAttribArray(lineProgram.a_position);
-                gl.vertexAttribPointer(lineProgram.a_position, 3, gl.FLOAT, false, 0, 0);
+                if (lineVAO) {
+                    gl.bindVertexArray(lineVAO);
+                } else {
+                    gl.enableVertexAttribArray(lineProgram.a_position);
+                    gl.vertexAttribPointer(lineProgram.a_position, 3, gl.FLOAT, false, 0, 0);
+                }
 
                 gl.drawArrays(gl.LINES, 0, 2);
             });
 
             // Clean up attributes
-            gl.disableVertexAttribArray(lineProgram.a_position);
+            if (lineVAO) {
+                gl.bindVertexArray(null);
+            } else {
+                gl.disableVertexAttribArray(lineProgram.a_position);
+            }
         }
 
         function updateTooltipTexture(text) {
@@ -641,11 +680,15 @@
             gl.uniform3fv(vrProgram.u_cameraRight, cameraRight);
             gl.uniform3fv(vrProgram.u_cameraUp, cameraUp);
 
-            gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-            gl.enableVertexAttribArray(vrProgram.a_position);
-            gl.vertexAttribPointer(vrProgram.a_position, 2, gl.FLOAT, false, 16, 0);
-            gl.enableVertexAttribArray(vrProgram.a_texCoord);
-            gl.vertexAttribPointer(vrProgram.a_texCoord, 2, gl.FLOAT, false, 16, 8);
+            if (hotspotVAO) {
+                gl.bindVertexArray(hotspotVAO);
+            } else {
+                gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+                gl.enableVertexAttribArray(vrProgram.a_position);
+                gl.vertexAttribPointer(vrProgram.a_position, 2, gl.FLOAT, false, 16, 0);
+                gl.enableVertexAttribArray(vrProgram.a_texCoord);
+                gl.vertexAttribPointer(vrProgram.a_texCoord, 2, gl.FLOAT, false, 16, 8);
+            }
 
             var hSize = 0.25;
             var wSize = hSize * tooltipAspect;
@@ -659,8 +702,12 @@
             gl.bindTexture(gl.TEXTURE_2D, tooltipTexture);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-            gl.disableVertexAttribArray(vrProgram.a_position);
-            gl.disableVertexAttribArray(vrProgram.a_texCoord);
+            if (hotspotVAO) {
+                gl.bindVertexArray(null);
+            } else {
+                gl.disableVertexAttribArray(vrProgram.a_position);
+                gl.disableVertexAttribArray(vrProgram.a_texCoord);
+            }
         }
 
         function updateSpinnerTexture(time) {
@@ -740,11 +787,15 @@
             gl.uniform3fv(vrProgram.u_cameraRight, cameraRight);
             gl.uniform3fv(vrProgram.u_cameraUp, cameraUp);
 
-            gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-            gl.enableVertexAttribArray(vrProgram.a_position);
-            gl.vertexAttribPointer(vrProgram.a_position, 2, gl.FLOAT, false, 16, 0);
-            gl.enableVertexAttribArray(vrProgram.a_texCoord);
-            gl.vertexAttribPointer(vrProgram.a_texCoord, 2, gl.FLOAT, false, 16, 8);
+            if (hotspotVAO) {
+                gl.bindVertexArray(hotspotVAO);
+            } else {
+                gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+                gl.enableVertexAttribArray(vrProgram.a_position);
+                gl.vertexAttribPointer(vrProgram.a_position, 2, gl.FLOAT, false, 16, 0);
+                gl.enableVertexAttribArray(vrProgram.a_texCoord);
+                gl.vertexAttribPointer(vrProgram.a_texCoord, 2, gl.FLOAT, false, 16, 8);
+            }
 
             gl.uniform2f(vrProgram.u_size, 0.3, 0.3);
 
@@ -761,8 +812,12 @@
             gl.bindTexture(gl.TEXTURE_2D, spinnerTexture);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-            gl.disableVertexAttribArray(vrProgram.a_position);
-            gl.disableVertexAttribArray(vrProgram.a_texCoord);
+            if (hotspotVAO) {
+                gl.bindVertexArray(null);
+            } else {
+                gl.disableVertexAttribArray(vrProgram.a_position);
+                gl.disableVertexAttribArray(vrProgram.a_texCoord);
+            }
         }
 
         // Convert spherical coordinates (pitch, yaw) of hotspot into 3D position
