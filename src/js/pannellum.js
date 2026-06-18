@@ -2733,6 +2733,27 @@ this.isLoaded = function() {
 };
 
 /**
+ * Returns the loading progress percentage (0 to 100).
+ * If progress is not computable or not currently loading, returns -1.
+ * @memberof Viewer
+ * @instance
+ * @returns {number} Loading progress percentage, or -1
+ */
+this.getLoadProgress = function() {
+    if (loaded) return 100;
+    if (infoDisplay && infoDisplay.load && infoDisplay.load.lbarFill) {
+        var display = infoDisplay.load.lbar.style.display;
+        if (display === 'block') {
+            var width = infoDisplay.load.lbarFill.style.width;
+            if (width && width.endsWith('%')) {
+                return parseFloat(width);
+            }
+        }
+    }
+    return -1;
+};
+
+/**
  * Returns the pitch of the center of the view.
  * @memberof Viewer
  * @instance

@@ -670,18 +670,51 @@
 
             spinnerCtx.clearRect(0, 0, 512, 512);
 
-            // Draw a spinning arc
-            var center = 256;
-            var radius = 200;
-            var startAngle = (time / 200) % (2 * Math.PI);
-            var endAngle = startAngle + 1.5 * Math.PI;
+            var progress = typeof viewer.getLoadProgress === 'function' ? viewer.getLoadProgress() : -1;
 
-            spinnerCtx.beginPath();
-            spinnerCtx.arc(center, center, radius, startAngle, endAngle);
-            spinnerCtx.lineWidth = 32;
-            spinnerCtx.lineCap = 'round';
-            spinnerCtx.strokeStyle = '#007AFF';
-            spinnerCtx.stroke();
+            var center = 256;
+            var radius = 180;
+
+            if (progress >= 0) {
+                // Draw a circular progress ring
+                // 1. Background circle
+                spinnerCtx.beginPath();
+                spinnerCtx.arc(center, center, radius, 0, 2 * Math.PI);
+                spinnerCtx.lineWidth = 16;
+                spinnerCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                spinnerCtx.stroke();
+
+                // 2. Progress arc
+                var startAngle = -0.5 * Math.PI; // Top
+                var endAngle = startAngle + (progress / 100) * 2 * Math.PI;
+                spinnerCtx.beginPath();
+                spinnerCtx.arc(center, center, radius, startAngle, endAngle);
+                spinnerCtx.lineWidth = 24;
+                spinnerCtx.lineCap = 'round';
+                spinnerCtx.strokeStyle = '#007AFF';
+                spinnerCtx.stroke();
+
+                // 3. Percentage text in the center
+                spinnerCtx.font = 'bold 80px sans-serif';
+                spinnerCtx.fillStyle = '#FFFFFF';
+                spinnerCtx.textAlign = 'center';
+                spinnerCtx.textBaseline = 'middle';
+                spinnerCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                spinnerCtx.shadowBlur = 10;
+                spinnerCtx.fillText(Math.round(progress) + '%', center, center);
+                spinnerCtx.shadowBlur = 0; // Reset shadow
+            } else {
+                // Draw indeterminate spinning arc
+                var startAngle = (time / 200) % (2 * Math.PI);
+                var endAngle = startAngle + 1.5 * Math.PI;
+
+                spinnerCtx.beginPath();
+                spinnerCtx.arc(center, center, radius, startAngle, endAngle);
+                spinnerCtx.lineWidth = 32;
+                spinnerCtx.lineCap = 'round';
+                spinnerCtx.strokeStyle = '#007AFF';
+                spinnerCtx.stroke();
+            }
 
             gl.bindTexture(gl.TEXTURE_2D, spinnerTexture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, spinnerCanvas);
