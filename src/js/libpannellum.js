@@ -31,25 +31,26 @@ window.libpannellum = (function(window, document, undefined) {
  * @param {HTMLElement} container - The container element for the renderer.
  * @param {WebGLRenderingContext} [context] - Existing WebGL context (instead of container).
  */
-function Renderer(container, context) {
-    var canvas;
+class Renderer {
+    constructor(container, context) {
+        let canvas;
     if (container) {
         canvas = document.createElement('canvas');
         canvas.style.width = canvas.style.height = '100%';
         container.appendChild(canvas);
     }
 
-    var program, gl, vs, fs;
-    var previewProgram, previewVs, previewFs;
-    var fallbackImgSize;
-    var world;
-    var vtmps;
-    var pose;
-    var image, imageType;
-    var texCoordBuffer, cubeVertBuf, cubeVertTexCoordBuf, cubeVertIndBuf;
-    var globalParams;
-    var sides = ['f', 'b', 'u', 'd', 'l', 'r'];
-    var fallbackSides = ['f', 'r', 'b', 'l', 'u', 'd'];
+    let program, gl, vs, fs;
+    let previewProgram, previewVs, previewFs;
+    let fallbackImgSize;
+    let world;
+    let vtmps;
+    let pose;
+    let image, imageType;
+    let texCoordBuffer, cubeVertBuf, cubeVertTexCoordBuf, cubeVertIndBuf;
+    let globalParams;
+    const sides = ['f', 'b', 'u', 'd', 'l', 'r'];
+    const fallbackSides = ['f', 'r', 'b', 'l', 'u', 'd'];
 
     if (context)
         gl = context;
@@ -179,7 +180,8 @@ function Renderer(container, context) {
             navigator.userAgent.match(/Trident.*rv[ :]*11\./)))) {
             // Enable WebGL on canvas
             if (!gl) {
-                gl = canvas.getContext('webgl', {alpha: false, depth: false, xrCompatible: true}) ||
+                gl = canvas.getContext('webgl2', {alpha: false, depth: false, xrCompatible: true}) ||
+                     canvas.getContext('webgl', {alpha: false, depth: false, xrCompatible: true}) ||
                      canvas.getContext('experimental-webgl', {alpha: false, depth: false, xrCompatible: true});
             }
             if (gl && gl.getError() == 1286)
@@ -2001,6 +2003,7 @@ function Renderer(container, context) {
         }
         return new ImageData(new Uint8ClampedArray(img), 64, 32);
     }
+}
 }
 
 // Vertex shader for equirectangular and cube
