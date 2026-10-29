@@ -70,5 +70,24 @@ var rendererTests = (function() {
             } finally { f.dispose(); }
         });
     });
+    test('source and context access do not draw or change GL state', function() {
+        var f = fixture();
+        try {
+            f.gl.useProgram(null);
+            var before = f.gl.getParameter(f.gl.CURRENT_PROGRAM);
+            var data = f.renderer.getSource();
+            assert(data.image === f.image && data.type === 'equirectangular', 'borrowed decoded source');
+            assert(data.width === 128 && data.height === 128 && data.haov === 2 * Math.PI, 'source metadata');
+            assert(f.renderer.getContext() === f.gl, 'context identity');
+            assert(f.gl.getParameter(f.gl.CURRENT_PROGRAM) === before && f.gl.getError() === 0, 'getter changed GL state');
+            data.haov = 1;
+            assert(f.renderer.getSource().haov === 2 * Math.PI, 'metadata snapshot must be independent');
+            f.renderer.setPose(0.2, 0.1);
+            assert(f.renderer.getSource().horizonPitch === 0.2, 'metadata follows horizon correction');
+            var called = false;
+            f.renderer.render(0, 0, Math.PI / 2, {hook:function() {called=true; return true;}});
+            assert(called && pixel(f.gl)[3] === 255 && f.gl.getError() === 0, 'legacy hook return value remains ignored');
+        } finally { f.dispose(); }
+    });
     return {test:test, run:run, assert:assert, source:source, fixture:fixture, pixel:pixel};
 })();
