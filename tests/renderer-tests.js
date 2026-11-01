@@ -205,19 +205,65 @@ var rendererTests = (function() {
             assert(f.gl.getError()===0, 'invalid camera changed GL state');
         } finally { f.dispose(); }
     });
-    test('external multires cameras are rejected until multires support is added', function() {
-        var f=fixture();
+    test('external multires cameras preserve other viewports when clearing is disabled', function() {
+        var f=fixture(), gl=f.gl;
         try {
             f.renderer.init({path:'../examples/multires/1/%s00', extension:'png',
                 tileResolution:128, cubeResolution:128, maxLevel:1},
                 'multires', 2*Math.PI, Math.PI, 0, function() {}, {});
-            var rejected=false;
-            try { f.renderer.render(0, 0, Math.PI/2, {view:{projectionMatrix:perspective(),
-                viewMatrix:camera(0,0,0), width:128, height:128}}); }
-            catch(e) { rejected=e instanceof TypeError; }
-            assert(rejected, 'unsupported multires camera must fail explicitly');
-            f.renderer.render(0, 0, Math.PI/2);
-            assert(f.gl.getError()===0, 'classic multires must still work');
+            gl.clearColor(1,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.viewport(64,0,64,128); gl.clearColor(0,0,1,1);
+            var view={projectionMatrix:perspective(), viewMatrix:camera(0,0,0), width:64, height:128};
+            f.renderer.render(0,0,Math.PI/2,{view:view, clear:false});
+            assert(pixel(gl,32,64)[0]===255, 'external draw cleared the other viewport');
+            f.renderer.render(0,0,Math.PI/2,{view:view});
+            assert(pixel(gl,32,64)[2]===255, 'supplying a camera changed default clearing');
+            assert(gl.getError()===0, 'multires external view GL error');
+        } finally { f.dispose(); }
+    });
+    test('external multires cameras match classic culling and use view dimensions for tile selection', function() {
+        var f=fixture(), program;
+        function capture(data) { program=data.program; }
+        function nodes() { return program.currentNodes.map(function(node) {return node.path;}).sort().join(); }
+        try {
+            f.renderer.init({path:'../examples/multires/%l/%s%y%x', extension:'png',
+                tileResolution:256, cubeResolution:2048, maxLevel:4},
+                'multires', 2*Math.PI, Math.PI, 0, function() {}, {});
+            f.renderer.setPose(0.2, -0.15);
+            f.renderer.render(0.3, 0.7, Math.PI/2, {roll:0.2, hook:capture});
+            var expected=nodes();
+            assert(expected.length>0, 'classic culling selected no tiles');
+            var view={projectionMatrix:perspective(), viewMatrix:camera(0.3,0.7,0.2), width:128, height:128};
+            f.renderer.render(0, 0, Math.PI/2, {view:view});
+            assert(nodes()===expected, 'external culling differs from the classic camera');
+            view.width=view.height=2048;
+            f.renderer.render(0, 0, Math.PI/2, {view:view});
+            var large=program.currentNodes.length;
+            view.width=view.height=64;
+            f.renderer.render(0, 0, Math.PI/2, {view:view});
+            assert(program.currentNodes.length<large, 'tile detail ignored the view dimensions');
+            f.renderer.render(0.3, 0.7, Math.PI/2, {roll:0.2});
+            assert(nodes()===expected, 'classic tile selection retained external dimensions');
+            assert(f.gl.getError()===0, 'multires culling GL error');
+        } finally { f.dispose(); }
+    });
+    test('multires preview follows the external camera and returns to classic rendering', function() {
+        var f=fixture();
+        try {
+            f.renderer.init({path:'../examples/multires/1/%s00', extension:'png',
+                tileResolution:128, cubeResolution:128, maxLevel:1,
+                equirectangularThumbnail:cameraImage()},
+                'multires', 2*Math.PI, Math.PI, 0, function() {}, {});
+            f.renderer.setPose(0.2, -0.15);
+            f.renderer.render(0.3, 0.7, Math.PI/2, {roll:0.2});
+            var expected=pixels(f.gl);
+            assert(expected[64*128*4+64*4+3]===255, 'preview did not render');
+            var view={projectionMatrix:perspective(), viewMatrix:camera(0.3,0.7,0.2), width:128, height:128};
+            f.renderer.render(0, 0, Math.PI/2, {view:view});
+            comparePixels(pixels(f.gl), expected, 'multires matrix preview');
+            f.renderer.render(0.3, 0.7, Math.PI/2, {roll:0.2});
+            comparePixels(pixels(f.gl), expected, 'classic preview recovery');
+            assert(f.gl.getError()===0, 'multires preview GL error');
         } finally { f.dispose(); }
     });
     return {test:test, run:run, assert:assert, source:source, fixture:fixture, pixel:pixel};

@@ -49,6 +49,7 @@ function Renderer(container, context) {
     var texCoordBuffer, cubeVertBuf, cubeVertTexCoordBuf, cubeVertIndBuf;
     var globalParams;
     var sourceAngles;
+    var renderWidth, renderHeight;
     var sides = ['f', 'b', 'u', 'd', 'l', 'r'];
     var fallbackSides = ['f', 'r', 'b', 'l', 'u', 'd'];
 
@@ -598,6 +599,8 @@ function Renderer(container, context) {
                 previewProgram.v = gl.getUniformLocation(previewProgram, 'u_v');
                 previewProgram.vo = gl.getUniformLocation(previewProgram, 'u_vo');
                 previewProgram.rot = gl.getUniformLocation(previewProgram, 'u_rot');
+                previewProgram.invProjView = gl.getUniformLocation(previewProgram, 'u_invProjView');
+                previewProgram.useMatrix = gl.getUniformLocation(previewProgram, 'u_useMatrix');
 
                 // Pass horizontal extent
                 gl.uniform1f(previewProgram.h, 1.0);
@@ -847,8 +850,6 @@ function Renderer(container, context) {
             roll += roll_adj;
         }
 
-        if (params.view && imageType == 'multires')
-            throw new TypeError('External cameras are not supported for multires sources');
         var view = params.view ? prepareView(params.view) : null;
         if (view) {
             pitch = Math.asin(Math.max(-1, Math.min(1, -view.rotation[6])));
@@ -898,6 +899,8 @@ function Renderer(container, context) {
             return;
         }
         
+        renderWidth = view ? params.view.width : gl.drawingBufferWidth;
+        renderHeight = view ? params.view.height : gl.drawingBufferHeight;
         bindRenderState();
 
         if (imageType != 'multires') {
@@ -940,6 +943,8 @@ function Renderer(container, context) {
             }
             if (drawPreview) {
                 gl.useProgram(previewProgram);
+                gl.uniform1i(previewProgram.useMatrix, Boolean(view));
+                if (view) gl.uniformMatrix4fv(previewProgram.invProjView, false, view.inverse);
                 gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
                 gl.vertexAttribPointer(previewProgram.texCoordLocation, 2, gl.FLOAT, false, 0, 0);
                 gl.bindTexture(gl.TEXTURE_2D, previewProgram.texture);
@@ -973,13 +978,18 @@ function Renderer(container, context) {
             matrix = rotateMatrix(matrix, yaw, 'y');
             matrix = makeMatrix4(matrix);
             
+            if (view) {
+                perspMatrix = transposeMatrix4(params.view.projectionMatrix);
+                matrix = transposeMatrix4(view.rotation);
+            }
+
             // Set matrix uniforms
             gl.uniformMatrix4fv(program.perspUniform, false, transposeMatrix4(perspMatrix));
             gl.uniformMatrix4fv(program.cubeUniform, false, transposeMatrix4(matrix));
             
             // Find current nodes
-            var rotPersp = rotatePersp(perspMatrix, matrix);
-            var rotPerspNoClip = rotatePersp(perspMatrixNoClip, matrix);
+            var rotPersp = view ? view.rotPersp : rotatePersp(perspMatrix, matrix);
+            var rotPerspNoClip = view ? view.rotPerspNoClip : rotatePersp(perspMatrixNoClip, matrix);
             program.nodeCache.sort(multiresNodeSort);
             if (program.nodeCache.length > 200 &&
                 program.nodeCache.length > program.currentNodes.length + 50) {
@@ -1275,8 +1285,8 @@ function Renderer(container, context) {
                 for (var i = 0; i < 4; i++) {
                     var j = (i + 1) % 4;
                     if (cornersInView[i] || cornersInView[j]) {
-                        var diffX = (cornersWinX[j] - cornersWinX[i]) * gl.drawingBufferWidth / 2,
-                            diffY = (cornersWinY[j] - cornersWinY[i]) * gl.drawingBufferHeight / 2;
+                        var diffX = (cornersWinX[j] - cornersWinX[i]) * renderWidth / 2,
+                            diffY = (cornersWinY[j] - cornersWinY[i]) * renderHeight / 2;
                         // Handle edge tiles
                         if (lastTileSize < image.tileResolution) {
                             if (node.x == numTiles)
@@ -1470,7 +1480,12 @@ function Renderer(container, context) {
             ]));
         }
         var combined = multiplyMatrix4(view.projectionMatrix, rotation);
-        return {rotation: rotation, inverse: invertMatrix4(combined)};
+        var noClip = new Float32Array(view.projectionMatrix);
+        noClip[10] = 0;
+        noClip[14] = 100;
+        return {rotation: rotation, inverse: invertMatrix4(combined),
+            rotPersp: transposeMatrix4(combined),
+            rotPerspNoClip: transposeMatrix4(multiplyMatrix4(noClip, rotation))};
     }
 
     function multiplyMatrix4(a, b) {

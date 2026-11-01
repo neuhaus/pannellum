@@ -31,9 +31,14 @@ panoramas draw their own background into the viewport. The caller manages
 framebuffer, viewport and scissor state.
 
 `render(pitch, yaw, hfov, {view: view})` accepts an external perspective camera
-for equirectangular and cubemap sources. Multires sources reject this option.
+for equirectangular, cubemap and multires sources.
 `view` contains column-major `projectionMatrix` and `viewMatrix` arrays (16 finite
 values each), plus positive pixel `width` and `height`. The caller binds its
 framebuffer and sets the viewport. The renderer applies its configured horizon
 correction and ignores camera translation for panorama viewing. The traditional
 pitch/yaw/hfov path remains the default.
+
+For multires sources, the renderer derives culling matrices internally and uses
+`view.width` and `view.height` for tile resolution selection. The same camera
+also applies to the equirectangular / SHT preview. Supplying a view does not
+implicitly change background clearing; use `clear: false` when needed.
