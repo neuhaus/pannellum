@@ -108,5 +108,117 @@ var rendererTests = (function() {
             assert(gl.getError() === 0, 'multires clear GL error');
         } finally { f.dispose(); }
     });
+    function perspective() {
+        return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,-1.002,-1, 0,0,-0.2002,0]);
+    }
+    function camera(pitch, yaw, roll) {
+        // Rotate camera basis vectors into the world, then transpose to a view.
+        var cp=Math.cos(pitch), sp=Math.sin(pitch), cy=Math.cos(yaw), sy=Math.sin(yaw);
+        var cr=Math.cos(roll), sr=Math.sin(roll);
+        var right=[cy*cr-sy*sp*sr, cp*sr, sy*cr+cy*sp*sr];
+        var up=[-cy*sr-sy*sp*cr, cp*cr, -sy*sr+cy*sp*cr];
+        var back=[-sy*cp, -sp, cy*cp];
+        return new Float32Array([right[0],up[0],back[0],0,
+            right[1],up[1],back[1],0, right[2],up[2],back[2],0, 0,0,0,1]);
+    }
+    function pixels(gl) {
+        var data = new Uint8Array(128*128*4);
+        gl.readPixels(0, 0, 128, 128, gl.RGBA, gl.UNSIGNED_BYTE, data);
+        return data;
+    }
+    function comparePixels(actual, expected, label, xOffset, yOffset, size) {
+        size = size || 128;
+        for (var y=8; y<size; y+=13) for (var x=8; x<size; x+=13) {
+            for (var c=0; c<4; c++) {
+                var a=actual[(y*128+x)*4+c];
+                var b=expected[((y+(yOffset||0))*128+x+(xOffset||0))*4+c];
+                assert(Math.abs(a-b)<=3, label+' at '+x+','+y+' channel '+c+': '+a+' vs '+b);
+            }
+        }
+    }
+    function cameraImage(face) {
+        var image=source(512, face === undefined ? 256 : 512), ctx=image.getContext('2d');
+        var data=ctx.createImageData(image.width, image.height);
+        for (var y=0; y<image.height; y++) for (var x=0; x<image.width; x++) {
+            var i=(y*image.width+x)*4;
+            data.data[i]=30+x/image.width*160;
+            data.data[i+1]=30+y/image.height*160;
+            data.data[i+2]=30+(face||0)*35;
+            data.data[i+3]=255;
+        }
+        ctx.putImageData(data, 0, 0);
+        return image;
+    }
+    ['equirectangular', 'cubemap'].forEach(function(type) {
+        test(type+' external cameras match classic rotation, horizon and asymmetric views', function() {
+            var f=fixture(type), gl=f.gl;
+            try {
+                var image=type==='cubemap' ? [0,1,2,3,4,5].map(cameraImage) : cameraImage();
+                f.renderer.init(image, type, 2*Math.PI, Math.PI, 0, function() {}, {});
+                var view={projectionMatrix:perspective(), viewMatrix:camera(0,0,0), width:128, height:128};
+                [[0,0,0], [0.3,0.7,0.2], [-0.4,-1.4,-0.3]].forEach(function(angles) {
+                    [false, true].forEach(function(correctHorizon) {
+                        f.renderer.setPose(correctHorizon ? 0.2 : 0, correctHorizon ? -0.15 : 0);
+                        f.renderer.render(angles[0], angles[1], Math.PI/2, {roll:angles[2]});
+                        var expected=pixels(gl);
+                        view.viewMatrix=camera(angles[0], angles[1], angles[2]);
+                        f.renderer.render(0, 0, Math.PI/2, {view:view});
+                        comparePixels(pixels(gl), expected, type+' matrix camera');
+                        view.viewMatrix[12]=10; view.viewMatrix[13]=3; view.viewMatrix[14]=-7;
+                        f.renderer.render(0, 0, Math.PI/2, {view:view});
+                        comparePixels(pixels(gl), expected, 'translation must not add parallax');
+                        f.renderer.render(angles[0], angles[1], Math.PI/2, {roll:angles[2]});
+                        comparePixels(pixels(gl), expected, 'return to classic camera');
+                    });
+                });
+                f.renderer.setPose(0, 0);
+                f.renderer.render(0, 0, Math.PI/2);
+                var full=pixels(gl);
+                view.projectionMatrix=perspective(); view.viewMatrix=camera(0,0,0);
+                view.projectionMatrix[0]=view.projectionMatrix[5]=2;
+                view.projectionMatrix[8]=0.5; view.projectionMatrix[9]=-0.5;
+                view.width=view.height=64;
+                gl.viewport(0, 0, 64, 64);
+                f.renderer.render(0, 0, Math.PI/2, {view:view});
+                comparePixels(pixels(gl), full, 'off-axis camera crop', 48, 16, 64);
+                assert(gl.getError()===0, 'camera GL error');
+            } finally { f.dispose(); }
+        });
+    });
+    test('invalid external cameras fail explicitly without changing the next classic draw', function() {
+        var f=fixture();
+        try {
+            f.renderer.render(0, 0, Math.PI/2);
+            var expected=pixels(f.gl);
+            [function(v) {v.projectionMatrix=new Float32Array(16);},
+                function(v) {v.viewMatrix[0]=NaN;}, function(v) {v.width=0;},
+                function(v) {v.viewMatrix=[1,2,3];}].forEach(function(invalidate) {
+                var view={projectionMatrix:perspective(), viewMatrix:camera(0,0,0), width:128, height:128};
+                invalidate(view);
+                var rejected=false;
+                try { f.renderer.render(0, 0, Math.PI/2, {view:view}); }
+                catch(e) { rejected=e instanceof RangeError || e instanceof TypeError; }
+                assert(rejected, 'invalid camera was accepted');
+                f.renderer.render(0, 0, Math.PI/2);
+                comparePixels(pixels(f.gl), expected, 'classic recovery');
+            });
+            assert(f.gl.getError()===0, 'invalid camera changed GL state');
+        } finally { f.dispose(); }
+    });
+    test('external multires cameras are rejected until multires support is added', function() {
+        var f=fixture();
+        try {
+            f.renderer.init({path:'../examples/multires/1/%s00', extension:'png',
+                tileResolution:128, cubeResolution:128, maxLevel:1},
+                'multires', 2*Math.PI, Math.PI, 0, function() {}, {});
+            var rejected=false;
+            try { f.renderer.render(0, 0, Math.PI/2, {view:{projectionMatrix:perspective(),
+                viewMatrix:camera(0,0,0), width:128, height:128}}); }
+            catch(e) { rejected=e instanceof TypeError; }
+            assert(rejected, 'unsupported multires camera must fail explicitly');
+            f.renderer.render(0, 0, Math.PI/2);
+            assert(f.gl.getError()===0, 'classic multires must still work');
+        } finally { f.dispose(); }
+    });
     return {test:test, run:run, assert:assert, source:source, fixture:fixture, pixel:pixel};
 })();

@@ -29,3 +29,11 @@ parameters and clear the appropriate viewport in the caller. This option control
 the multires background clear; the default remains unchanged. Monolithic
 panoramas draw their own background into the viewport. The caller manages
 framebuffer, viewport and scissor state.
+
+`render(pitch, yaw, hfov, {view: view})` accepts an external perspective camera
+for equirectangular and cubemap sources. Multires sources reject this option.
+`view` contains column-major `projectionMatrix` and `viewMatrix` arrays (16 finite
+values each), plus positive pixel `width` and `height`. The caller binds its
+framebuffer and sets the viewport. The renderer applies its configured horizon
+correction and ignores camera translation for panorama viewing. The traditional
+pitch/yaw/hfov path remains the default.
