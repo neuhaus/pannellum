@@ -432,6 +432,8 @@ function Renderer(container, context) {
             program.v = gl.getUniformLocation(program, 'u_v');
             program.vo = gl.getUniformLocation(program, 'u_vo');
             program.rot = gl.getUniformLocation(program, 'u_rot');
+            program.invProjView = gl.getUniformLocation(program, 'u_invProjView');
+            program.useMatrix = gl.getUniformLocation(program, 'u_useMatrix');
 
             // Pass horizontal extent, vertical extent, and vertical offset
             gl.uniform1f(program.h, haov / (Math.PI * 2.0));
@@ -795,6 +797,9 @@ function Renderer(container, context) {
      * @param {Object} [params] - Extra configuration parameters. 
      * @param {number} [params.roll] - Camera roll (in radians).
      * @param {string} [params.returnImage] - Return rendered image? If specified, should be 'ImageBitmap', 'image/jpeg', or 'image/png'.
+     * @param {Object} [params.view] - External perspective view: column-major
+     *      `projectionMatrix`, `viewMatrix`, and positive pixel `width`, `height`.
+     *      Panorama translation is ignored; horizon correction is applied internally.
      * @param {boolean} [params.clear=true] - Clear multires background before drawing.
      * @param {function} [params.hook] - Hook for executing arbitrary function in this environment.
      * @param {boolean} [params.dynamic] - Whether or not the image is dynamic (e.g., video) and should be updated.
@@ -840,6 +845,14 @@ function Renderer(container, context) {
             if (v[2] < 0)
                 roll_adj = 2 * Math.PI - roll_adj;
             roll += roll_adj;
+        }
+
+        if (params.view && imageType == 'multires')
+            throw new TypeError('External cameras are not supported for multires sources');
+        var view = params.view ? prepareView(params.view) : null;
+        if (view) {
+            pitch = Math.asin(Math.max(-1, Math.min(1, -view.rotation[6])));
+            yaw = Math.atan2(-view.rotation[2], view.rotation[10]);
         }
 
         // Execute function hook
@@ -888,6 +901,8 @@ function Renderer(container, context) {
         bindRenderState();
 
         if (imageType != 'multires') {
+            gl.uniform1i(program.useMatrix, Boolean(view));
+            if (view) gl.uniformMatrix4fv(program.invProjView, false, view.inverse);
             // Calculate focal length from vertical field of view
             var vfov = 2 * Math.atan(Math.tan(hfov * 0.5) / (gl.drawingBufferWidth / gl.drawingBufferHeight));
             focal = 1 / Math.tan(vfov * 0.5);
@@ -1435,6 +1450,89 @@ function Renderer(container, context) {
         ]);
     }
     
+    function prepareView(view) {
+        if (!(view.width > 0 && view.height > 0) || !isFinite(view.width) || !isFinite(view.height))
+            throw new RangeError('View dimensions must be positive');
+        [view.projectionMatrix, view.viewMatrix].forEach(function(matrix) {
+            if (!matrix || matrix.length != 16) throw new TypeError('Camera matrices must contain 16 values');
+            for (var i = 0; i < 16; i++)
+                if (!isFinite(matrix[i])) throw new TypeError('Camera matrix contains a non-finite value');
+        });
+        var rotation = new Float32Array(view.viewMatrix);
+        rotation[12] = rotation[13] = rotation[14] = 0;
+        if (pose) {
+            var cp = Math.cos(pose[0]), sp = Math.sin(pose[0]);
+            var cr = Math.cos(pose[1]), sr = Math.sin(pose[1]);
+            // Inverse of the source sampling correction Rx(-pitch) * Rz(roll).
+            rotation = multiplyMatrix4(rotation, new Float32Array([
+                cr, -sr, 0, 0, sr*cp, cr*cp, sp, 0,
+                -sr*sp, -cr*sp, cp, 0, 0, 0, 0, 1
+            ]));
+        }
+        var combined = multiplyMatrix4(view.projectionMatrix, rotation);
+        return {rotation: rotation, inverse: invertMatrix4(combined)};
+    }
+
+    function multiplyMatrix4(a, b) {
+        var out = new Float32Array(16);
+        for (var col = 0; col < 4; col++) {
+            for (var row = 0; row < 4; row++) {
+                var sum = 0;
+                for (var k = 0; k < 4; k++) {
+                    sum += a[k * 4 + row] * b[col * 4 + k];
+                }
+                out[col * 4 + row] = sum;
+            }
+        }
+        return out;
+    }
+
+    function invertMatrix4(m) {
+        var out = new Float32Array(16);
+        var m00 = m[0], m01 = m[4], m02 = m[8], m03 = m[12];
+        var m10 = m[1], m11 = m[5], m12 = m[9], m13 = m[13];
+        var m20 = m[2], m21 = m[6], m22 = m[10], m23 = m[14];
+        var m30 = m[3], m31 = m[7], m32 = m[11], m33 = m[15];
+
+        var b00 = m00 * m11 - m01 * m10;
+        var b01 = m00 * m12 - m02 * m10;
+        var b02 = m00 * m13 - m03 * m10;
+        var b03 = m01 * m12 - m02 * m11;
+        var b04 = m01 * m13 - m03 * m11;
+        var b05 = m02 * m13 - m03 * m12;
+        var b06 = m20 * m31 - m21 * m30;
+        var b07 = m20 * m32 - m22 * m30;
+        var b08 = m20 * m33 - m23 * m30;
+        var b09 = m21 * m32 - m22 * m31;
+        var b10 = m21 * m33 - m23 * m31;
+        var b11 = m22 * m33 - m23 * m32;
+
+        var det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+
+        if (!det) throw new RangeError('Camera matrix is singular');
+        det = 1.0 / det;
+
+        out[0] = (m11 * b11 - m12 * b10 + m13 * b09) * det;
+        out[1] = (m12 * b08 - m10 * b11 - m13 * b07) * det;
+        out[2] = (m10 * b10 - m11 * b08 + m13 * b06) * det;
+        out[3] = (m11 * b07 - m10 * b09 - m12 * b06) * det;
+        out[4] = (m02 * b10 - m01 * b11 - m03 * b09) * det;
+        out[5] = (m00 * b11 - m02 * b08 + m03 * b07) * det;
+        out[6] = (m01 * b08 - m00 * b10 - m03 * b06) * det;
+        out[7] = (m00 * b09 - m01 * b07 + m02 * b06) * det;
+        out[8] = (m31 * b05 - m32 * b04 + m33 * b03) * det;
+        out[9] = (m32 * b02 - m30 * b05 - m33 * b01) * det;
+        out[10] = (m30 * b04 - m31 * b02 + m33 * b00) * det;
+        out[11] = (m31 * b01 - m30 * b03 - m32 * b00) * det;
+        out[12] = (m22 * b04 - m21 * b05 - m23 * b03) * det;
+        out[13] = (m20 * b05 - m22 * b02 + m23 * b01) * det;
+        out[14] = (m21 * b02 - m20 * b04 - m23 * b00) * det;
+        out[15] = (m20 * b03 - m21 * b01 + m22 * b00) * det;
+
+        return out;
+    }
+
+
     /**
      * Creates 3x3 identity matrix.
      * @private
@@ -1966,6 +2064,8 @@ var fragEquiCubeBase = [
 'uniform float u_v;',
 'uniform float u_vo;',
 'uniform float u_rot;',
+'uniform mat4 u_invProjView;',
+'uniform bool u_useMatrix;',
 
 'const float PI = 3.14159265358979323846264;',
 
@@ -1982,19 +2082,29 @@ var fragEquiCubeBase = [
 'uniform vec4 u_backgroundColor;',
 
 'void main() {',
-    // Map canvas/camera to sphere
-    'float x = v_texCoord.x * u_aspectRatio;',
-    'float y = v_texCoord.y;',
-    'float sinrot = sin(u_rot);',
-    'float cosrot = cos(u_rot);',
-    'float rot_x = x * cosrot - y * sinrot;',
-    'float rot_y = x * sinrot + y * cosrot;',
-    'float sintheta = sin(u_theta);',
-    'float costheta = cos(u_theta);',
-    'float a = u_f * costheta - rot_y * sintheta;',
-    'float root = sqrt(rot_x * rot_x + a * a);',
-    'float lambda = atan(rot_x / root, a / root) + u_psi;',
-    'float phi = atan((rot_y * costheta + u_f * sintheta) / root);',
+    'float lambda;',
+    'float phi;',
+    'if (u_useMatrix) {',
+        'vec4 rayDir = u_invProjView * vec4(v_texCoord, 1.0, 1.0);',
+        'vec3 dir = normalize(rayDir.xyz);',
+        'dir.z = -dir.z;',
+        'lambda = atan(dir.x, dir.z);',
+        'phi = asin(clamp(dir.y, -1.0, 1.0));',
+    '} else {',
+        // Map canvas/camera to sphere
+        'float x = v_texCoord.x * u_aspectRatio;',
+        'float y = v_texCoord.y;',
+        'float sinrot = sin(u_rot);',
+        'float cosrot = cos(u_rot);',
+        'float rot_x = x * cosrot - y * sinrot;',
+        'float rot_y = x * sinrot + y * cosrot;',
+        'float sintheta = sin(u_theta);',
+        'float costheta = cos(u_theta);',
+        'float a = u_f * costheta - rot_y * sintheta;',
+        'float root = sqrt(rot_x * rot_x + a * a);',
+        'lambda = atan(rot_x / root, a / root) + u_psi;',
+        'phi = atan((rot_y * costheta + u_f * sintheta) / root);',
+    '}',
 ].join('\n');
 
 // Fragment shader
