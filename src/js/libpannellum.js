@@ -48,6 +48,7 @@ function Renderer(container, context) {
     var image, imageType;
     var texCoordBuffer, cubeVertBuf, cubeVertTexCoordBuf, cubeVertIndBuf;
     var globalParams;
+    var sourceAngles;
     var sides = ['f', 'b', 'u', 'd', 'l', 'r'];
     var fallbackSides = ['f', 'r', 'b', 'l', 'u', 'd'];
 
@@ -84,6 +85,7 @@ function Renderer(container, context) {
 
         imageType = _imageType;
         image = _image;
+        sourceAngles = {haov: haov, vaov: vaov, vOffset: voffset};
         globalParams = params || {};
 
         // Clear old data
@@ -1026,6 +1028,33 @@ function Renderer(container, context) {
         }
     };
     
+    /**
+     * Get the decoded source and its projection metadata without drawing.
+     * Dimensions refer to one face for cubemaps; angles are in radians.
+     * The image is borrowed: callers must not close or replace it.
+     * @returns {Object|null} Source snapshot, or null before initialization.
+     */
+    this.getSource = function() {
+        if (!image) return null;
+        var face = imageType == 'cubemap' ? image[0] : image;
+        return {
+            image: image, type: imageType,
+            width: face.videoWidth || face.naturalWidth || face.width || 0,
+            height: face.videoHeight || face.naturalHeight || face.height || 0,
+            haov: sourceAngles.haov, vaov: sourceAngles.vaov, vOffset: sourceAngles.vOffset,
+            horizonPitch: pose ? pose[0] : 0, horizonRoll: pose ? pose[1] : 0
+        };
+    };
+
+    /**
+     * Get the shared WebGL context, or undefined for the CSS fallback.
+     * The renderer owns the context lifetime; callers must not destroy it.
+     * @returns {WebGLRenderingContext|undefined} Rendering context.
+     */
+    this.getContext = function() {
+        return gl;
+    };
+
     /**
      * Check if images are loading.
      * @memberof Renderer
