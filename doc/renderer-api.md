@@ -23,3 +23,9 @@ programs or buffer implementation details.
 
 The existing `render(..., {hook: callback})` hook retains its previous behavior:
 its return value is ignored.
+
+For multiple views sharing one framebuffer, set `clear: false` in the render
+parameters and clear the appropriate viewport in the caller. This option controls
+the multires background clear; the default remains unchanged. Monolithic
+panoramas draw their own background into the viewport. The caller manages
+framebuffer, viewport and scissor state.

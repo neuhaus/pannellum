@@ -89,5 +89,24 @@ var rendererTests = (function() {
             assert(called && pixel(f.gl)[3] === 255 && f.gl.getError() === 0, 'legacy hook return value remains ignored');
         } finally { f.dispose(); }
     });
+    test('multires clear option preserves another viewport and defaults to clearing', function() {
+        var f = fixture(), gl = f.gl;
+        try {
+            f.renderer.init({path:'../examples/multires/1/%s00', extension:'png',
+                tileResolution:128, cubeResolution:128, maxLevel:1},
+                'multires', 2*Math.PI, Math.PI, 0, function() {}, {});
+            gl.clearColor(1, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.viewport(64, 0, 64, 128); gl.clearColor(0, 0, 1, 1);
+            f.renderer.render(0, 0, Math.PI/2, {clear:false});
+            assert(pixel(gl, 32, 64)[0] === 255, 'clear:false erased the other viewport');
+            f.renderer.render(0, 0, Math.PI/2);
+            assert(pixel(gl, 32, 64)[2] === 255, 'omitting clear must retain the existing clear');
+            gl.clearColor(1, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.clearColor(0, 0, 1, 1);
+            f.renderer.render(0, 0, Math.PI/2, {clear:true});
+            assert(pixel(gl, 32, 64)[2] === 255, 'clear:true did not clear');
+            assert(gl.getError() === 0, 'multires clear GL error');
+        } finally { f.dispose(); }
+    });
     return {test:test, run:run, assert:assert, source:source, fixture:fixture, pixel:pixel};
 })();

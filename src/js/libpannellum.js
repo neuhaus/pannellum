@@ -795,6 +795,7 @@ function Renderer(container, context) {
      * @param {Object} [params] - Extra configuration parameters. 
      * @param {number} [params.roll] - Camera roll (in radians).
      * @param {string} [params.returnImage] - Return rendered image? If specified, should be 'ImageBitmap', 'image/jpeg', or 'image/png'.
+     * @param {boolean} [params.clear=true] - Clear multires background before drawing.
      * @param {function} [params.hook] - Hook for executing arbitrary function in this environment.
      * @param {boolean} [params.dynamic] - Whether or not the image is dynamic (e.g., video) and should be updated.
      */
@@ -1013,7 +1014,7 @@ function Renderer(container, context) {
                 program.textureLoads.shift()(true);
 
             // Draw tiles
-            multiresDraw(!isPreview);
+            multiresDraw(!isPreview && params.clear !== false);
         }
         
         if (params.returnImage !== undefined) {
