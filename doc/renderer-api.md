@@ -42,3 +42,15 @@ For multires sources, the renderer derives culling matrices internally and uses
 `view.width` and `view.height` for tile resolution selection. The same camera
 also applies to the equirectangular / SHT preview. Supplying a view does not
 implicitly change background clearing; use `clear: false` when needed.
+
+
+`viewer.suspendRendering()` hands presentation to an external loop and returns
+an idempotent release function. Nested suspensions resume desktop rendering only
+when all releases have been called. Loading and scene events continue. Desktop
+animation, automatic viewport resizing and DOM scene fades are suspended. On final
+release, the desktop viewport is restored and rendering resumes. Automatic
+rotation configuration is retained; in-progress animated moves and input inertia
+are stopped. Releases after viewer destruction are harmless.
+
+An extension must release its own resources in the viewer's `destroy` event.
+The core contains no XR session or presentation-mode flag.
