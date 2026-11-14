@@ -1,0 +1,101 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pannellum (WebXR fork)</title>
+    <meta name="description" content="Pannellum panorama viewer with experimental WebXR / VR headset support.">
+    <style>
+        :root { color-scheme: light dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Helvetica, "Nimbus Sans L", "Liberation Sans", Arial, sans-serif;
+            line-height: 1.5;
+            color: #24292f;
+            background: #f4f4f4;
+        }
+        main {
+            max-width: 42rem;
+            margin: 0 auto;
+            padding: 3rem 1.25rem 4rem;
+        }
+        h1 { margin: 0 0 .25rem; font-size: 2rem; }
+        h2 { margin: 2.5rem 0 .75rem; font-size: 1.25rem; }
+        .tag {
+            font-size: .8rem;
+            font-weight: normal;
+            vertical-align: middle;
+            padding: .15rem .5rem;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .lead { font-size: 1.05rem; color: #57606a; }
+        .cta { margin: 1.75rem 0 .5rem; }
+        .button {
+            display: inline-block;
+            padding: .7rem 1.4rem;
+            border-radius: 6px;
+            background: #1f6feb;
+            color: #fff;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .button:hover { background: #1158c7; }
+        .hint { font-size: .9rem; color: #57606a; }
+        ul { padding-left: 1.25rem; }
+        li { margin: .35rem 0; }
+        a { color: #1f6feb; }
+        footer {
+            margin-top: 3rem;
+            padding-top: 1rem;
+            border-top: 1px solid #d0d7de;
+            font-size: .85rem;
+            color: #57606a;
+        }
+        code { font-size: .85em; }
+        @media (prefers-color-scheme: dark) {
+            body { color: #e6edf3; background: #0d1117; }
+            .lead, .hint, footer { color: #8b949e; }
+            .tag { background: #1f3a5f; color: #9ecbff; }
+            footer { border-top-color: #30363d; }
+            a { color: #58a6ff; }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Pannellum <span class="tag">WebXR fork</span></h1>
+    <p class="lead">
+        A lightweight panorama viewer for the web, with experimental VR headset
+        support via the WebXR Device API.
+    </p>
+
+    <p class="cta"><a class="button" href="examples/example-webxr.htm">Launch the WebXR VR demo</a></p>
+    <p class="hint">
+        Needs a WebXR-capable browser over HTTPS. Open it on a headset
+        (e.g. Meta Quest) and press the goggles button in the control bar to
+        enter immersive VR.
+    </p>
+
+    <h2>Bundled examples</h2>
+    <ul>
+        <li><a href="build/pannellum.htm">Standalone viewer</a> &mdash; the minified single-file build</li>
+        <li><a href="examples/example.htm">Simple embed</a> &mdash; an <code>&lt;iframe&gt;</code> using the source files</li>
+        <li><a href="examples/example-minified.htm">Minified embed</a> &mdash; the same, using the minified build</li>
+        <li><a href="examples/example-cube.htm">Cubemap</a></li>
+        <li><a href="examples/example-tour.htm">Tour</a> &mdash; multiple scenes with hotspots</li>
+        <li><a href="examples/example-multires.htm">Multi-resolution</a></li>
+    </ul>
+
+    <footer>
+        <p>
+            A fork of <a href="https://github.com/mpetroff/pannellum">mpetroff/pannellum</a>;
+            up-to-date documentation lives at <a href="https://pannellum.org/">pannellum.org</a>.
+            Built from <code>@VERSION@</code>.
+        </p>
+    </footer>
+</main>
+</body>
+</html>

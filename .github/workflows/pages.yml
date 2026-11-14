@@ -1,0 +1,57 @@
+name: Build & deploy to GitHub Pages
+
+# Builds the minified viewer (utils/build/build.py) and publishes it together
+# with the bundled examples to GitHub Pages, served at
+# https://neuhaus.github.io/pannellum/.
+#
+# WebXR only works in a secure context, so the HTTPS origin provided by Pages
+# is what makes the VR headset demo testable. The workflow lives on
+# feature/webxr because that is where the WebXR support is, and it must be
+# present on the pushed branch for the push trigger below to fire.
+#
+# Requires: Settings -> Pages -> Build and deployment -> Source:
+# "GitHub Actions".
+
+on:
+  push:
+    branches: ["feature/webxr"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Java and Python 3 are preinstalled on ubuntu-latest.
+      - name: Build and assemble the site
+        run: ./scripts/build-site.sh
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

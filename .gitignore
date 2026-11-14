@@ -13,6 +13,9 @@ utils/doc/generated_docs
 # Ignore logs
 tests/*.log
 
+# Ignore the assembled GitHub Pages site
+_site/
+
 # Ignore local development server and SSL certs
 server.js
 key.pem
